@@ -103,9 +103,8 @@ int main(int argc, char *argv[]){
         memcpy(reply, packet + ICMP_HDRLEN + IP4_HDRLEN, datalen);
 
         float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
-        printf("%ld bytes from %s: icmp_seq=%d ttl= time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter,
+        printf("%ld bytes from %s: icmp_seq=%d ttl=10 time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter++,
                milliseconds);
-        icmp_seq_counter++;
     }
 
     // Close the raw socket descriptor.
