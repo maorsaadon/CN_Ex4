@@ -32,7 +32,6 @@ int main(int argc, char *argv[]){
     strcpy(ptr_IP , argv[1]);
 
     int flage = validateIp(ptr_IP);
-    printf("%d\n" , flage);
     if (flage == 0)
     {
         printf("Ip isn't valid!\n");
@@ -98,9 +97,6 @@ int main(int argc, char *argv[]){
         }
 
         gettimeofday(&end, 0);
-
-        char reply[IP_MAXPACKET];
-        memcpy(reply, packet + ICMP_HDRLEN + IP4_HDRLEN, datalen);
 
         float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
         printf("%ld bytes from %s: icmp_seq=%d ttl=10 time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter++,
