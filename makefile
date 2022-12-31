@@ -3,7 +3,7 @@ ping: ping.c
 	gcc ping.c -o parta
 watchdog: watchdog.c
 	gcc watchdog.c -o watchdog
-better_ping: new_ping.c
+better_ping: better_ping.c
 	gcc better_ping.c -o partb
 
 clean:
