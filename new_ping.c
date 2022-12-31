@@ -7,36 +7,30 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <fcntl.h>
 
-#define IP4_HDRLEN 20// IPv4 header len without options
 #define ICMP_HDRLEN 8// ICMP header len for echo req
-#define SOURCE_IP "10.0.2.15"
+#define WATCHDOG_PORT 3000//watchdog port by request
+#define SERVER_IP_ADDRESS "127.0.0.1"
 
 //function declaration
 unsigned short calculate_checksum(unsigned short *paddress, int len);
 int validateNumber(char *str);
 int validateIp(char *ip);
 
-// run 2 programs using fork + exec
-// command: make clean && make all && ./partb
-
 int main(int argc, char *argv[]){
+    //check the IP
     if (argc != 2) {
         perror("you need to put IP!");
         exit(-1);
     }
-
     char ptr_IP[15];
     strcpy(ptr_IP , argv[1]);
-
     int flage = validateIp(ptr_IP);
     if (flage == 0)
     {
@@ -44,37 +38,69 @@ int main(int argc, char *argv[]){
         exit(-1);
     }
 
-    struct sockaddr_in dest_in;
-    memset(&dest_in, 0, sizeof(struct sockaddr_in));
-    dest_in.sin_family = AF_INET;
-    dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
+    // run 2 programs using fork + exec
+    // command: make clean && make all && ./partb
+    char *args[2];
+    // compiled watchdog.c by makefile
+    args[0] = "./watchdog";
+    args[1] = NULL;
+    int status;
+    int pid = fork();
+    if (pid == 0)
+    {
+        printf("in child \n");
+        execvp(args[0], args);
+        // alarm(10);
+    }
 
-    //open socket
+    //open a socket for watchdog
+    int watchdogSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (watchdogSocket == -1) {
+        printf("Could not create socket : %d\n", errno);
+        return -1;
+    } else printf("New socket opened\n");
+    struct sockaddr_in serverAddress;
+    memset(&serverAddress, 0, sizeof(serverAddress));
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(WATCHDOG_PORT);
+    int rval = inet_pton(AF_INET, (const char *) SERVER_IP_ADDRESS, &serverAddress.sin_addr);
+    if (rval <= 0) {
+        printf("inet_pton() failed");
+        return -1;
+    }
+
+    sleep(5);
+
+    // Make a connection with watchdog
+    int connectResult = connect(watchdogSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress));
+    if (connectResult == -1) {
+        printf("connect() failed with error code : %d\n", errno);
+        close(watchdogSocket);
+        return -1;
+    } else printf("connected to watchdog\n");
+
+    //open socket for ping
     int sock = -1;
     if ((sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
         fprintf(stderr, "socket() failed with error: %d", errno);
         fprintf(stderr, "To create a raw socket, the process needs to be run by Admin/root user.\n\n");
         return -1;
     }
-    int  icmp_seq_counter = 0;
+    struct sockaddr_in dest_in;
+    memset(&dest_in, 0, sizeof(struct sockaddr_in));
+    dest_in.sin_family = AF_INET;
+    dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
+
+    //Change the socket into non-blocking state
+    fcntl(watchdogSocket, F_SETFL, O_NONBLOCK);
+
+    //for calculate the time
+    struct timeval start, end;
+    int  icmp_seq_counter = 0;//seq counter
     while (1) {
-        char *args[2];
-        // compiled watchdog.c by makefile
-        args[0] = "./watchdog";
-        args[1] = NULL;
-        int status;
-        int pid = fork();
 
-        if (pid == 0)
-        {
-            printf("in child \n");
-            execvp(args[0], args);
-            // alarm(10);
-        }
-        wait(&status);// waiting for child to finish before exiting
-        printf("child exit status is: %d\n", status);
-
-        struct icmp icmphdr; // ICMP-header
+        // ICMP-header
+        struct icmp icmphdr;
         char data[IP_MAXPACKET] = "This is the ping.\n";
         int datalen = strlen(data) + 1;
 
@@ -90,7 +116,21 @@ int main(int argc, char *argv[]){
                                                 ICMP_HDRLEN + datalen);// Calculate the ICMP header checksum
         memcpy((packet), &icmphdr, ICMP_HDRLEN);
 
-        struct timeval start, end;
+        //if NEW_PING receive a stop signal -> break out and finish the program
+        int failed = 1;
+        int r = recv(watchdogSocket, &failed, sizeof(int), 0);//receiving from new_ping the sign
+        if(r > 0){
+            break;
+        }
+
+        //if NEW_PING don't receive a stop signal -> send to watch dog that NEW_PING ready to start sending ping
+        int ready = 1;
+        int s = send(watchdogSocket, &ready, sizeof(int), 0);
+        if (s == -1) printf("send() failed with error code : %d", errno);
+        else if (s == 0) printf("peer has closed the TCP connection prior to send().\n");
+
+        int sl =5*(icmp_seq_counter+1);//for test - check if the watchdog make the NEW_PING to shut down
+        sleep(sl);
         gettimeofday(&start, 0);
 
         // Send the packet using sendto() for sending datagrams.
@@ -115,6 +155,7 @@ int main(int argc, char *argv[]){
 
         gettimeofday(&end, 0);
 
+        //calculate the time
         float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
         printf("%ld bytes from %s: icmp_seq=%d ttl=10 time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter++,
                milliseconds);
@@ -122,7 +163,10 @@ int main(int argc, char *argv[]){
 
     // Close the raw socket descriptor.
     close(sock);
+    printf("server <%s> cannot be reached.\n", argv[1]);
 
+    wait(&status);// waiting for child to finish before exiting
+    printf("child exit status is: %d\n", status);
     return 0;
 }
 
@@ -147,7 +191,7 @@ unsigned short calculate_checksum(unsigned short *paddress, int len)
         sum += answer;
     }
 
-    // add back carry outs from top 16 bits to low 16 bits
+    // add back carry-outs from top 16 bits to low 16 bits
     sum = (sum >> 16) + (sum & 0xffff); // add hi 16 to low 16
     sum += (sum >> 16);                 // add carry
     answer = ~sum;                      // truncate to 16 bits

@@ -13,9 +13,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#define IP4_HDRLEN 20// IPv4 header len without options
 #define ICMP_HDRLEN 8// ICMP header len for echo req
-#define SOURCE_IP "10.0.2.15"
 
 //function declaration
 unsigned short calculate_checksum(unsigned short *paddress, int len);
@@ -23,25 +21,19 @@ int validateNumber(char *str);
 int validateIp(char *ip);
 
 int main(int argc, char *argv[]){
+    //check the IP
     if (argc != 2) {
         perror("you need to put IP!");
         exit(-1);
     }
-
     char ptr_IP[15];
     strcpy(ptr_IP , argv[1]);
-
     int flage = validateIp(ptr_IP);
     if (flage == 0)
     {
         printf("Ip isn't valid!\n");
         exit(-1);
     }
-
-    struct sockaddr_in dest_in;
-    memset(&dest_in, 0, sizeof(struct sockaddr_in));
-    dest_in.sin_family = AF_INET;
-    dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
 
     //open socket
     int sock = -1;
@@ -50,6 +42,11 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "To create a raw socket, the process needs to be run by Admin/root user.\n\n");
         return -1;
     }
+    struct sockaddr_in dest_in;
+    memset(&dest_in, 0, sizeof(struct sockaddr_in));
+    dest_in.sin_family = AF_INET;
+    dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
+
     int  icmp_seq_counter = 0;
     while (1) {
         struct icmp icmphdr; // ICMP-header
@@ -73,6 +70,7 @@ int main(int argc, char *argv[]){
                                                 ICMP_HDRLEN + datalen);// Calculate the ICMP header checksum
         memcpy((packet), &icmphdr, ICMP_HDRLEN);
 
+        //for calculate the time
         struct timeval start, end;
         gettimeofday(&start, 0);
 
@@ -98,6 +96,7 @@ int main(int argc, char *argv[]){
 
         gettimeofday(&end, 0);
 
+        //calculate the time
         float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
         printf("%ld bytes from %s: icmp_seq=%d ttl=10 time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter++,
                milliseconds);
@@ -129,7 +128,7 @@ unsigned short calculate_checksum(unsigned short *paddress, int len)
         sum += answer;
     }
 
-    // add back carry outs from top 16 bits to low 16 bits
+    // add back carry-outs from top 16 bits to low 16 bits
     sum = (sum >> 16) + (sum & 0xffff); // add hi 16 to low 16
     sum += (sum >> 16);                 // add carry
     answer = ~sum;                      // truncate to 16 bits
