@@ -65,7 +65,7 @@ int main()
     //for calculate the time
     struct timeval start, end;
     float seconds = 0;
-
+    sleep(1);
     //checking if watchdog receive something from ping if yes then update the start time if no then the time will stop updating and then second>10 -> shut down
     while (seconds <= 10){
         int new_ping_ready = 1;
