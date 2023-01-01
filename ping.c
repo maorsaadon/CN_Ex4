@@ -47,11 +47,17 @@ int main(int argc, char *argv[]){
     dest_in.sin_family = AF_INET;
     dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
 
+    struct icmp icmphdr; // ICMP-header
+    char data[IP_MAXPACKET] = "This is the ping.\n";
+    int datalen = strlen(data) + 1;
+
+
+    printf("PING %s (%s): %d data bytes\n", argv[1], argv[1], datalen);
+    //for calculate the time
+    struct timeval start, end;
+    gettimeofday(&start, 0);
     int  icmp_seq_counter = 0;
     while (1) {
-        struct icmp icmphdr; // ICMP-header
-        char data[IP_MAXPACKET] = "This is the ping.\n";
-        int datalen = strlen(data) + 1;
 
         //ICMP header
         //___________
@@ -70,9 +76,7 @@ int main(int argc, char *argv[]){
                                                 ICMP_HDRLEN + datalen);// Calculate the ICMP header checksum
         memcpy((packet), &icmphdr, ICMP_HDRLEN);
 
-        //for calculate the time
-        struct timeval start, end;
-        gettimeofday(&start, 0);
+        sleep(1);
 
         // Send the packet using sendto() for sending datagrams.
         int bytes_sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *) &dest_in, sizeof(dest_in));

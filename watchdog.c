@@ -6,10 +6,11 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #define WATCHDOG_PORT 3000
 
-int main()
+int main(int argc, char *argv[])
 {
     // Open the listening socket
     int listeningSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -37,7 +38,7 @@ int main()
         printf("Bind failed with error code : %d\n", errno);
         close(listeningSocket);
         return -1;
-    } else printf("executed Bind() successfully\n");
+    }
 
     // Make the socket listen.
     int listenResult = listen(listeningSocket, 3);
@@ -45,7 +46,7 @@ int main()
         printf("listen() failed with error code : %d\n", errno);
         close(listeningSocket);
         return -1;
-    } else printf("Waiting for incoming TCP-connections...\n");
+    }
 
     // Accept and incoming connection
     struct sockaddr_in clientAddress;
@@ -56,7 +57,7 @@ int main()
         printf("listen failed with error code : %d\n", errno);
         close(listeningSocket);
         return -1;
-    } else printf("Connection accepted\n");
+    }
 
     //Change the sockets into non-blocking state
     fcntl(listeningSocket, F_SETFL, O_NONBLOCK);
@@ -77,12 +78,13 @@ int main()
         seconds = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0f;
     }
 
-    //send signal that make the new_ping to stop
-    int failed = 1;
-    send(clientSocket, &failed, sizeof(int), 0);
-
     close(clientSocket);//close the clientSocket
     close(listeningSocket);//listeningSocket
+    printf("server <%s> cannot be reached.\n", argv[1]);
+
+    //reboot the system
+    kill(getppid(),SIGKILL);
+
     return 0;
 
 }

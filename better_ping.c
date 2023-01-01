@@ -43,14 +43,12 @@ int main(int argc, char *argv[]){
     char *args[2];
     // compiled watchdog.c by makefile
     args[0] = "./watchdog";
-    args[1] = NULL;
+    args[1] = argv[1];
     int status;
     int pid = fork();
     if (pid == 0)
     {
-        printf("in child \n");
         execvp(args[0], args);
-        // alarm(10);
     }
 
     //open a socket for watchdog
@@ -58,7 +56,7 @@ int main(int argc, char *argv[]){
     if (watchdogSocket == -1) {
         printf("Could not create socket : %d\n", errno);
         return -1;
-    } else printf("New socket opened\n");
+    }
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
@@ -69,7 +67,7 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
-    sleep(5);
+    sleep(3);
 
     // Make a connection with watchdog
     int connectResult = connect(watchdogSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress));
@@ -77,7 +75,7 @@ int main(int argc, char *argv[]){
         printf("connect() failed with error code : %d\n", errno);
         close(watchdogSocket);
         return -1;
-    } else printf("connected to watchdog\n");
+    }
 
     //open socket for ping
     int sock = -1;
@@ -94,15 +92,18 @@ int main(int argc, char *argv[]){
     //Change the socket into non-blocking state
     fcntl(watchdogSocket, F_SETFL, O_NONBLOCK);
 
+    // ICMP-header
+    struct icmp icmphdr;
+    char data[IP_MAXPACKET] = "This is the ping.\n";
+    int datalen = strlen(data) + 1;
+
+
+
     //for calculate the time
     struct timeval start, end;
     int  icmp_seq_counter = 0;//seq counter
+    printf("PING %s (%s): %d data bytes\n", argv[1], argv[1], datalen);
     while (1) {
-
-        // ICMP-header
-        struct icmp icmphdr;
-        char data[IP_MAXPACKET] = "This is the ping.\n";
-        int datalen = strlen(data) + 1;
 
         icmphdr.icmp_type = ICMP_ECHO;// Message Type (8 bits): ICMP_ECHO_REQUEST
         icmphdr.icmp_code = 0;// Message Code (8 bits): echo request
@@ -126,19 +127,21 @@ int main(int argc, char *argv[]){
         //if NEW_PING don't receive a stop signal -> send to watch dog that NEW_PING ready to start sending ping
         int ready = 1;
         int s = send(watchdogSocket, &ready, sizeof(int), 0);
-        if (s == -1) printf("send() failed with error code : %d", errno);
-        else if (s == 0) printf("peer has closed the TCP connection prior to send().\n");
 
-        int sl =5*(icmp_seq_counter+1);//for test - check if the watchdog make the NEW_PING to shut down
+
+        int sl =3*(icmp_seq_counter+1);//for test - check if the watchdog make the NEW_PING to shut down
         sleep(sl);
-        gettimeofday(&start, 0);
+        //gettimeofday(&start, 0);
 
+        gettimeofday(&start, 0);
+        
         // Send the packet using sendto() for sending datagrams.
         int bytes_sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *) &dest_in, sizeof(dest_in));
         if (bytes_sent == -1) {
             fprintf(stderr, "sendto() failed with error: %d", errno);
             return -1;
         }
+
 
         // Get the ping response
         bzero(packet, IP_MAXPACKET);
@@ -163,10 +166,9 @@ int main(int argc, char *argv[]){
 
     // Close the raw socket descriptor.
     close(sock);
-    printf("server <%s> cannot be reached.\n", argv[1]);
+
 
     wait(&status);// waiting for child to finish before exiting
-    printf("child exit status is: %d\n", status);
     return 0;
 }
 
