@@ -121,7 +121,7 @@ int main(int argc, char *argv[]){
         gettimeofday(&start, 0);
         int sl =3*(icmp_seq_counter+1);//for test - check if the watchdog make the NEW_PING to shut down
         sleep(sl);
-        
+
         // Send the packet using sendto() for sending datagrams.
         int bytes_sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *) &dest_in, sizeof(dest_in));
         if (bytes_sent == -1) {
