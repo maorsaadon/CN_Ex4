@@ -61,8 +61,7 @@ int main(int argc, char *argv[])
 
     //Change the sockets into non-blocking state
     fcntl(listeningSocket, F_SETFL, O_NONBLOCK);
-    fcntl(clientSocket,F_SETFL, O_NONBLOCK);//Change the socket into non-blocking state
-
+    fcntl(clientSocket,F_SETFL, O_NONBLOCK);
     //for calculate the time
     struct timeval start, end;
     float seconds = 0;
