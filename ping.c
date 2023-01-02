@@ -55,7 +55,6 @@ int main(int argc, char *argv[]){
     printf("PING %s (%s): %d data bytes\n", argv[1], argv[1], datalen);
     //for calculate the time
     struct timeval start, end;
-    gettimeofday(&start, 0);
     int  icmp_seq_counter = 0;
     while (1) {
 
@@ -76,8 +75,7 @@ int main(int argc, char *argv[]){
                                                 ICMP_HDRLEN + datalen);// Calculate the ICMP header checksum
         memcpy((packet), &icmphdr, ICMP_HDRLEN);
 
-        sleep(1);
-
+        gettimeofday(&start, 0);
         // Send the packet using sendto() for sending datagrams.
         int bytes_sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *) &dest_in, sizeof(dest_in));
         if (bytes_sent == -1) {
@@ -104,6 +102,7 @@ int main(int argc, char *argv[]){
         float milliseconds = (end.tv_sec - start.tv_sec) * 1000.0f + (end.tv_usec - start.tv_usec) / 1000.0f;
         printf("%ld bytes from %s: icmp_seq=%d ttl=10 time=%f ms)\n", bytes_received, argv[1], icmp_seq_counter++,
                milliseconds);
+        sleep(1);
     }
 
     // Close the raw socket descriptor.

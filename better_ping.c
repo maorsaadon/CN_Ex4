@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include <fcntl.h>
 
 #define ICMP_HDRLEN 8// ICMP header len for echo req
 #define WATCHDOG_PORT 3000//watchdog port by request
@@ -89,9 +88,6 @@ int main(int argc, char *argv[]){
     dest_in.sin_family = AF_INET;
     dest_in.sin_addr.s_addr = inet_addr(argv[1]);// The port is irrelant for Networking and therefore was zeroed.
 
-    //Change the socket into non-blocking state
-    fcntl(watchdogSocket, F_SETFL, O_NONBLOCK);
-
     // ICMP-header
     struct icmp icmphdr;
     char data[IP_MAXPACKET] = "This is the ping.\n";
@@ -117,23 +113,14 @@ int main(int argc, char *argv[]){
                                                 ICMP_HDRLEN + datalen);// Calculate the ICMP header checksum
         memcpy((packet), &icmphdr, ICMP_HDRLEN);
 
-        //if NEW_PING receive a stop signal -> break out and finish the program
-        int failed = 1;
-        int r = recv(watchdogSocket, &failed, sizeof(int), 0);//receiving from new_ping the sign
-        if(r > 0){
-            break;
-        }
 
         //if NEW_PING don't receive a stop signal -> send to watch dog that NEW_PING ready to start sending ping
         int ready = 1;
         int s = send(watchdogSocket, &ready, sizeof(int), 0);
 
-
+        gettimeofday(&start, 0);
         int sl =3*(icmp_seq_counter+1);//for test - check if the watchdog make the NEW_PING to shut down
         sleep(sl);
-        //gettimeofday(&start, 0);
-
-        gettimeofday(&start, 0);
         
         // Send the packet using sendto() for sending datagrams.
         int bytes_sent = sendto(sock, packet, ICMP_HDRLEN + datalen, 0, (struct sockaddr *) &dest_in, sizeof(dest_in));
